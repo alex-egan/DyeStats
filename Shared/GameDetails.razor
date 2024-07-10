@@ -1,0 +1,99 @@
+@using DyeStats.Classes;
+@using Microsoft.AspNetCore.Components;
+@using DyeStats.Services.LogService;
+@using DyeStats.Services.LocationService;
+@inject ILocationService LocationService;
+@inject ILogService LogService
+
+@if (true)
+{
+    <MudDialog>
+        <DialogContent>
+            <MudTextField Label="Name" @bind-Value=Game.Name></MudTextField>
+            <MudSelect ReadOnly=@(Game.Id != null) Label="Location" Placeholder="Select Location" @bind-Value=Game.Location>
+                @for (int x = 0; x < Locations.Count(); x++) {
+                    <MudSelectItem Value=Locations[x].Id>@Locations[x].Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudDatePicker Label="Date" Placeholder="Select Date" @bind-Date=Game.Date></MudDatePicker>
+            <MudNumericField Label="Number of Players" Placeholder="4" Value="_numPlayers" @onchange="ChangePlayerCount"></MudNumericField>
+            @for (int i = 0; i < Game.Teams.Count(); i++)
+            {
+                int x = i;
+                <MudContainer>
+                    <MudText>Team @(x + 1)</MudText>
+                    @for (int j = 0; j < Game.Teams[x].Players.Count(); j++)
+                    {
+                        int y = j;
+                        <MudSelect Value=Game.Teams[x].Players[y] ValueChanged="@((ObjectId id) => OnPlayerChanged(id, x, y))" T="ObjectId" Label="@($"Player")" AnchorOrigin="Origin.BottomCenter">
+                            @foreach (Player player in Players)
+                            {
+                                @if (!Game.Teams.SelectMany(p => p.Players).Contains(player.Id) || Game.Teams[x].Players[y] == player.Id)
+                                {
+                                    <MudSelectItem Value="@(player.Id)">@player.Name</MudSelectItem>
+                                }
+                            }
+                        </MudSelect>
+                    }
+                </MudContainer>
+            }
+        </DialogContent>
+        <DialogActions>
+            <MudButton OnClick="SaveGame">Save</MudButton>
+            @if (Game.Id != null)
+            {
+                <MudButton OnClick="CancelEdit">Cancel</MudButton>
+            }
+        </DialogActions>
+    </MudDialog>
+}
+
+@code {
+    [Parameter]
+    public Game? Game { get; set; }
+
+    [Parameter]
+    public List<Player>? Players { get; set; }
+    
+    [Parameter]
+    public List<Location>? Locations { get; set; }
+
+    [CascadingParameter] MudDialogInstance MudDialog { get; set; }
+    private int _numPlayers = 4;
+
+    private void OnPlayerChanged(ObjectId id, int x, int y) {
+        try {
+            Game.Teams[x].Players[y] = id;
+            LogService.LogMessage(Game.Teams[x].Players[y].ToString());
+        }
+        catch (Exception e) {
+            LogService.LogError(e);
+        }
+    }
+
+    private void CancelEdit() {
+        MudDialog.Cancel();
+    }
+
+    private void SaveGame() {
+        MudDialog.Close(DialogResult.Ok(Game));
+    }
+
+    private void ChangePlayerCount(ChangeEventArgs e) {
+        bool success = int.TryParse(e.Value.ToString(), out int count);
+
+        if (success && count % 2 == 0) {
+            SetPlayers(count);
+        }
+    }
+
+    private void SetPlayers(int playerCount) {
+        List<ObjectId> players = new List<ObjectId>();
+        for (int x = 0; x < playerCount/2; x++) {
+            players.Add(ObjectId.Empty);
+        }
+        
+        Game.Teams[0].Players = players.ToList();
+        Game.Teams[1].Players = players.ToList();
+    }
+}

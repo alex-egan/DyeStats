@@ -1,0 +1,160 @@
+@page "/locations"
+@using DyeStats.Services.LocationService;
+@using DyeStats.Services.LogService;
+@using DyeStats.Services.PlayTypeService;
+@using DyeStats.Classes;
+@using MudBlazor;
+@using DyeStats.Shared;
+@inject IPlayTypeService PlayTypeService;
+@inject ILocationService LocationService;
+@inject ILogService LogService;
+@inject NavigationManager NavigationManager;
+@inject ISnackbar Snackbar;
+@inject IDialogService DialogService;
+
+<MudContainer>
+    <MudTable Items="@Locations" T="Location" CanCancelEdit="true" Filter="new Func<Location,bool>(FilterFunc)">
+        <ToolBarContent>
+            <MudText Typo="Typo.h6">Locations</MudText>
+            <MudSpacer />
+            <MudTextField @bind-Value="SearchString" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+        </ToolBarContent>
+        <ColGroup>
+            <col style="width:30%;" />
+            <col style="width:50%;" />
+            <col style="width:20%;" />
+        </ColGroup>
+        <HeaderContent>
+            <MudTh>Name</MudTh>
+            <MudTh>Description</MudTh>
+            <MudTh></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="String">@context.Name</MudTd>
+            <MudTd DataLabel="Description">@context.Description</MudTd>
+            <MudTd DataLabel="Edit">
+                <MudButton OnClick="@(async () => await OpenLocationDetails(context))">Edit</MudButton>
+            </MudTd>
+        </RowTemplate>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
+    </MudTable>
+    <MudButton OnClick="@(async () => await OpenLocationDetails(new Location()))">Add Location</MudButton>
+</MudContainer>
+
+@code {
+    [Parameter]
+    public string? Id { get; set; }
+    public List<Location> Locations { get; set; } = new List<Location>();
+    public Location Location { get; set; } = new Location();
+    private string SearchString = "";
+
+    protected override void OnInitialized()
+    {
+        ServiceResponse<List<Location>?> response = LocationService.GetAllLocations();
+        
+        if (response.Success && response.Data != null) {
+            Locations = response.Data;
+        }
+    }
+
+    private bool FilterFunc(Location location) => FilterFunction(location, SearchString);
+
+    private bool FilterFunction(Location location, string searchString)
+    {
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+        if (location.Name.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (location.Description.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        return false;
+    }
+
+    private void SaveLocation(Location location) {
+        try {
+            ServiceResponse<Location?> response = LocationService.UpsertLocation(location);
+            LogService.LogMessage($"Location Name: {location.Name}");
+            
+            if (response.Success && response.Data != null) {
+                if (Locations.Select(l => l.Id).Contains(location.Id)) {
+                    int index = Locations.IndexOf(location);
+                    Locations[index] = response.Data;
+                }
+                else {
+                    Locations.Add(response.Data);
+                }
+            }
+        }
+        catch (Exception e) {
+            LogService.LogError(e);
+        }
+    }
+
+    private async Task OpenLocationDetails(Location location) {
+        try {
+            Location = location;
+            ServiceResponse<HashSet<PlayType>?> response = PlayTypeService.GetAllPlayTypes();
+            var parameters = new DialogParameters<LocationDetails>();
+            if (location.Id == null) {
+                location.HouseRules = GetDefaultRules();
+            }
+            parameters.Add(x => x.Location, Location);
+            parameters.Add(x => x.PlayTypes, response.Data.ToList());
+            
+            var options = new DialogOptions() { DisableBackdropClick = true };
+            var dialog = await DialogService.ShowAsync<LocationDetails>(location.Id == null ? "New Location" : location.Name, parameters, options);
+            var result = await dialog.Result;
+
+            if (!result.Canceled) {
+                SaveLocation(Location);
+            }
+        }
+        catch (Exception e) {
+            LogService.LogError(e);
+        }
+    }
+
+    private List<PlayType> GetDefaultRules() {
+        return new List<PlayType>();
+        @* PlayType live = new PlayType {
+            Name = "Live",
+            Category = PlayCategory.Live,
+            Description = "The dice hits the opposing team's side and leaves the table.",
+            CatchRequired = true,
+            Points = new int[2] {1, 0}
+        };
+
+        PlayType dead = new PlayType {
+            Name = "Dead",
+            Category = PlayCategory.Dead,
+            Description = "The dice misses table or does not hit the opposing team's side of the table.",
+            Points = new int[2] {0, 0}
+        };
+
+        PlayType fifa = new PlayType {
+            Name = "Fifa",
+            Category = PlayCategory.Fifa,
+            Description = "The dice is kicked by an opposing player and caught.",
+            Points = new int[2] {0, 1},
+            CatchRequired = true
+        };
+
+        PlayType sink = new PlayType {
+            Name = "Sink",
+            Category = PlayCategory.Sink,
+            Description = "The dice lands in a cup.",
+            Points = new int[2] {3, 0}
+        };
+
+        PlayType selfSink = new PlayType {
+            Name = "Self Sink",
+            Category = PlayCategory.Sink,
+            Description = "The dice lands in one of the tossing team's cups.",
+            Points = new int[2] {0, 0}
+        };
+
+        return new List<PlayType> { live, dead, fifa, sink, selfSink}; *@
+    }
+}

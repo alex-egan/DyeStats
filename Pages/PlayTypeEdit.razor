@@ -1,0 +1,125 @@
+@page "/play-types"
+@using DyeStats.Classes;
+@using Microsoft.AspNetCore.Components;
+@using DyeStats.Services.LogService;
+@using DyeStats.Services.PlayTypeService;
+@inject IPlayTypeService PlayTypeService;
+@inject ILogService LogService;
+
+<MudTable Items="@PlayTypes" T="PlayType" CanCancelEdit="true"
+          @bind-SelectedItem="SelectedType" SortLabel="Sort By" CommitEditTooltip="Commit Edit" RowEditPreview="BackupRule" RowEditCancel="ResetItemToOriginalValues"
+          RowEditCommit="ItemHasBeenCommitted" IsEditRowSwitchingBlocked="false" ApplyButtonPosition="@applyButtonPosition" EditButtonPosition="@editButtonPosition" EditTrigger="@editTrigger">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">Play Types</MudText>
+        <MudSpacer />
+        <MudTextField @bind-Value="SearchString" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+    </ToolBarContent>
+    <ColGroup>
+        <col style="width:30%;" />
+        <col style="width:30%;" />
+        <col style="width:20%" />
+        <col style="width:20%;" />
+    </ColGroup>
+    <HeaderContent>
+        <MudTh>Name</MudTh>
+        <MudTh>Description</MudTh>
+        <MudTh>Category</MudTh>
+        <MudTh>Points</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="String">@context.Name</MudTd>
+        <MudTd DataLabel="Description">@context.Description</MudTd>
+        <MudTd DataLabel="Category">@context.Category</MudTd>
+        <MudTd DataLabel="Points Awarded">
+            <MudNumericField AdornmentIcon="none" Label="Tossing Team" Value=@context.Points[0]></MudNumericField>
+            <MudNumericField AdornmentIcon="none" Label="Defending Team" Value=@context.Points[1]></MudNumericField>
+        </MudTd>
+    </RowTemplate>
+    <RowEditingTemplate>
+        <MudTd DataLabel="Name">
+            <MudTextField Label="Name" @bind-Value="@context.Name" Required />
+        </MudTd>
+        <MudTd DataLabel="Description">
+            <MudTextField Label="Description" @bind-Value="@context.Description" Required />
+        </MudTd>
+        <MudTd DataLabel="Category">
+            <MudSelect @bind-Value="@context.Category">
+                <MudSelectItem Value="PlayCategory.Fifa">Fifa</MudSelectItem>
+                <MudSelectItem Value="PlayCategory.Dead">Dead</MudSelectItem>
+                <MudSelectItem Value="PlayCategory.Live">Live</MudSelectItem>
+                <MudSelectItem Value="PlayCategory.Sink">Sink</MudSelectItem>
+            </MudSelect>
+        </MudTd>
+        <MudTd DataLabel="Points">
+            <MudNumericField Label="Points Awarded to Tossing Team" @bind-Value="@context.Points[0]" Required />
+            <MudNumericField Label="Points Awarded to Defending Team" @bind-Value="@context.Points[1]" Required />
+        </MudTd>
+    </RowEditingTemplate>
+    <PagerContent>
+        <MudTablePager />
+    </PagerContent>
+    <EditButtonContent Context="button">
+        <MudIconButton Size="@Size.Small" Icon="@Icons.Material.Outlined.Edit" Class="pa-0" OnClick="@button.ButtonAction" Disabled="@button.ButtonDisabled" />
+    </EditButtonContent>
+</MudTable>
+<MudButton OnClick="AddPlayType">Add House Rule</MudButton>
+
+@code {
+    [Parameter]
+    public List<PlayType>? PlayTypes { get; set; }
+    public PlayType? SelectedType { get; set; }
+    public string SearchString { get; set; } = "";
+    private List<string> editEvents = new();
+    private TableApplyButtonPosition applyButtonPosition = TableApplyButtonPosition.End;
+    private TableEditButtonPosition editButtonPosition = TableEditButtonPosition.End;
+    private TableEditTrigger editTrigger = TableEditTrigger.RowClick;
+
+        protected override void OnInitialized()
+        {
+            ServiceResponse<HashSet<PlayType>?> response = PlayTypeService.GetAllPlayTypes();
+
+            if (response.Success) {
+                PlayTypes = response.Data.ToList();
+            } 
+        }
+
+        private void BackupRule(object element)
+    {
+        AddEditionEvent($"RowEditPreview event: made a backup of Element {((PlayType)element)}");
+    }
+
+    private void ItemHasBeenCommitted(object element)
+    {
+        PlayType playType = (PlayType)element;
+        ServiceResponse<PlayType> response = PlayTypeService.UpsertPlayType((PlayType)element);
+        if (response.Success) {
+            int index = PlayTypes.IndexOf(playType);
+            PlayTypes[index] = response.Data;
+        }
+    }
+
+    private void ResetItemToOriginalValues(object element)
+    {
+        //This needs to be done using Json Serializing
+        @* ((Element)element).Sign = elementBeforeEdit.Sign;
+        ((Element)element).Name = elementBeforeEdit.Name;
+        ((Element)element).Molar = elementBeforeEdit.Molar;
+        ((Element)element).Position = elementBeforeEdit.Position; *@
+        AddEditionEvent($"RowEditCancel event: Editing of Element {((PlayType)element)} canceled");
+    }
+
+    private void ClearEventLog()
+    {
+        editEvents.Clear();
+    }
+
+    private void AddEditionEvent(string message)
+    {
+        editEvents.Add(message);
+        StateHasChanged();
+    }
+
+    private void AddPlayType() {
+        PlayTypes.Add(new PlayType());
+    }
+}

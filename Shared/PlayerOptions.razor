@@ -1,0 +1,51 @@
+@using DyeStats.Classes
+@using DyeStats.Services.LogService;
+@using DyeStats.Services.PlayService;
+@inject ILogService LogService
+@inject IPlayService PlayService
+@inject IDialogService DialogService
+
+<MudContainer>
+    <MudButton Variant="Variant.Text" Align="Align.Center" GutterBottom="true" OnClick="@(async () => await OpenPlayerDetails())">@(Player != null ? Player.Name : "")</MudButton>
+    <MudPaper Class="container">
+        <MudButton OnClick="@(async () => CreatePlay(PlayCategory.Dead))" Class="box rounded-circle" Variant="Variant.Outlined">Dead</MudButton>
+        <MudButton OnClick="@(async () => CreatePlay(PlayCategory.Live))" Class="box rounded-circle" Variant="Variant.Outlined">Live</MudButton>
+        <MudButton OnClick="@(async () => CreatePlay(PlayCategory.Sink))" Class="box rounded-circle" Variant="Variant.Outlined">Sink</MudButton>
+        <MudButton OnClick="@(async () => CreatePlay(PlayCategory.Fifa))" Class="box rounded-circle" Variant="Variant.Outlined">Fifa</MudButton>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    [Parameter]
+    public Player? Player { get; set; }
+
+    [Parameter]
+    public EventCallback<PlayCategory> OnPlayTypeSelected { get; set; }
+
+    private async Task CreatePlay(PlayCategory category) {
+        try {
+            LogService.LogMessage($"Play Type Button Triggered: {category}");
+            await OnPlayTypeSelected.InvokeAsync(category);
+        }
+        catch (Exception e) {
+            LogService.LogError(e);
+        }
+    }
+
+    private async Task OpenPlayerDetails() {
+        try {
+            var parameters = new DialogParameters<PlayerDetails>();
+            ServiceResponse<HashSet<Play>?> response = PlayService.GetAllPlaysForPlayer(Player.Id);
+            List<Play> plays = response.Data.ToList();
+            parameters.Add(x => x.Player, Player);
+            parameters.Add(x => x.Plays, plays);
+            
+            var options = new DialogOptions() { DisableBackdropClick = true };
+            var dialog = await DialogService.ShowAsync<PlayerDetails>(Player.Name, parameters, options);
+            var result = await dialog.Result;
+        }
+        catch (Exception e) {
+            LogService.LogError(e);
+        }
+    }
+}

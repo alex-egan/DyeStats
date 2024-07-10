@@ -1,0 +1,124 @@
+@using System.Net.Http.Json
+@using MudBlazor
+@using DyeStats.Classes;
+@using DyeStats.Services.PlayService;
+@using DyeStats.Services.LogService;
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject IPlayService PlayService
+@inject ILogService LogService
+
+<MudTable Items="@Items" Dense="@dense" Hover="@hover" ReadOnly="@ronly" CanCancelEdit="@canCancelEdit" Filter="new Func<Player,bool>(FilterFunc)"
+          @bind-SelectedItem="selectedItem1" SortLabel="Sort By" CommitEditTooltip="Commit Edit"
+          OnCommitEditClick="@(() => Snackbar.Add("Commit Edit Handler Invoked"))" RowEditPreview="BackupItem" RowEditCancel="ResetItemToOriginalValues"
+          RowEditCommit="ItemHasBeenCommitted" IsEditRowSwitchingBlocked="@blockSwitch" ApplyButtonPosition="@applyButtonPosition" EditButtonPosition="@editButtonPosition" EditTrigger="@editTrigger">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">Players</MudText>
+        <MudSpacer />
+        <MudTextField @bind-Value="searchString" Placeholder="Search" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+    </ToolBarContent>
+    <ColGroup>
+        <col style="width:60%;" />
+        <col style="width:40%;" />
+    </ColGroup>
+    <HeaderContent>
+        <MudTh>Name</MudTh>
+        <MudTh></MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="String">@context.Name</MudTd>
+        <MudTd DataLabel=""><MudButton @onclick="@(async () => await OpenPlayerDetails(context.Id))">Details</MudButton></MudTd>
+    </RowTemplate>
+    <RowEditingTemplate>
+        <MudTd DataLabel="Test">
+            <MudTextField @bind-Value="@context.Name" Required />
+        </MudTd>
+        <MudTd DataLabel="Test">
+            <MudButton @onclick="@(async () => await OpenPlayerDetails(context.Id))">Details</MudButton>
+        </MudTd>
+    </RowEditingTemplate>
+    <PagerContent>
+        <MudTablePager />
+    </PagerContent>
+    <EditButtonContent Context="button">
+        <MudIconButton Size="@Size.Small" Icon="@Icons.Material.Outlined.Edit" Class="pa-0" OnClick="@button.ButtonAction" Disabled="@button.ButtonDisabled" />
+    </EditButtonContent>
+</MudTable>
+
+@code {
+    [Parameter]
+    public HashSet<Player>? Items { get; set; }
+    private List<string> editEvents = new();
+    private bool dense = false;
+    private bool hover = true;
+    private bool ronly = false;
+    private bool canCancelEdit = false;
+    private bool blockSwitch = false;
+    private string searchString = "";
+    private Player? selectedItem1;
+    private Player? elementBeforeEdit;
+    private HashSet<Player> selectedItems1 = new HashSet<Player>();
+    private TableApplyButtonPosition applyButtonPosition = TableApplyButtonPosition.End;
+    private TableEditButtonPosition editButtonPosition = TableEditButtonPosition.End;
+    private TableEditTrigger editTrigger = TableEditTrigger.RowClick;
+
+    private void ClearEventLog()
+    {
+        editEvents.Clear();
+    }
+
+    private void AddEditionEvent(string message)
+    {
+        editEvents.Add(message);
+        StateHasChanged();
+    }
+
+    private void BackupItem(object element)
+    {
+        AddEditionEvent($"RowEditPreview event: made a backup of Element {((Player)element)}");
+    }
+
+    private void ItemHasBeenCommitted(object element)
+    {
+        AddEditionEvent($"RowEditCommit event: Changes to Element {((Player)element)} committed");
+    }
+
+    private void ResetItemToOriginalValues(object element)
+    {
+        //This needs to be done using Json Serializing
+        @* ((Element)element).Sign = elementBeforeEdit.Sign;
+        ((Element)element).Name = elementBeforeEdit.Name;
+        ((Element)element).Molar = elementBeforeEdit.Molar;
+        ((Element)element).Position = elementBeforeEdit.Position; *@
+        AddEditionEvent($"RowEditCancel event: Editing of Element {((Player)element)} canceled");
+    }
+
+    private bool FilterFunc(Player player) => FilterFunction(player, searchString);
+
+    private bool FilterFunction(Player player, string searchString)
+    {
+        if (string.IsNullOrWhiteSpace(searchString))
+            return true;
+        if (player.Name.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+        return false;
+    }
+
+    private async Task OpenPlayerDetails(ObjectId id) {
+        try {
+            var parameters = new DialogParameters<PlayerDetails>();
+            ServiceResponse<HashSet<Play>?> response = PlayService.GetAllPlaysForPlayer(id);
+            List<Play> plays = response.Data.ToList();
+            Player player = Items.ToList().Find(p => p.Id == id);
+            parameters.Add(x => x.Player, player);
+            parameters.Add(x => x.Plays, plays);
+            
+            var options = new DialogOptions() { DisableBackdropClick = true };
+            var dialog = await DialogService.ShowAsync<PlayerDetails>(player.Name, parameters, options);
+            var result = await dialog.Result;
+        }
+        catch (Exception e) {
+            LogService.LogError(e);
+        }
+    }
+}

@@ -1,0 +1,39 @@
+@using DyeStats.Classes;
+@using Microsoft.AspNetCore.Components;
+@using DyeStats.Services.LogService;
+@inject ILogService LogService
+
+<MudDialog>
+    <DialogContent>
+        <MudNumericField T="int" ReadOnly="true" Label="Number of Plays" Value=Player.GetPlayTotal(Plays)></MudNumericField>
+        <MudNumericField T="int" ReadOnly="true" Label="Number of Sinks" Value=Player.GetSinkTotal(Plays)></MudNumericField>
+        <MudNumericField T="double" Format="N2" ReadOnly="true" Label="Hit Percentage" Value="Player.CalculateHitPercentage(Plays)"></MudNumericField>
+        <MudNumericField T="double" Format="N2" ReadOnly="true" Label="Catch Percentage" Value="Player.CalculateCatchPercentage(Plays)"></MudNumericField>
+        <MudNumericField T="double" Format="N2" ReadOnly="true" Label="Scoring Percentage" Value="Player.CalculateScorePercentage(Plays)"></MudNumericField>
+        <MudNumericField T="double" Format="N2" ReadOnly="true" Label="Fifa Kick Percentage" Value="Player.CalculateKickPercentage(Plays)"></MudNumericField>
+        <MudNumericField T="double" Format="N2" ReadOnly="true" Label="Fifa Catch Percentage" Value="Player.CalculateFifaPercentage(Plays)"></MudNumericField>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick=SavePlayer>Submit</MudButton>
+        <MudButton OnClick="CloseDetails">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter]
+    public Player? Player { get; set; }
+
+    [Parameter]
+    public List<Play>? Plays { get; set; }
+    
+    [CascadingParameter] 
+    public MudDialogInstance MudDialog { get; set; }
+
+    private void CloseDetails() {
+        MudDialog.Cancel();
+    }
+
+    private void SavePlayer() {
+        MudDialog.Close(DialogResult.Ok(Player));
+    }
+}

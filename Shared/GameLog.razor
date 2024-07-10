@@ -1,0 +1,41 @@
+@using DyeStats.Classes;
+
+<MudDialog>
+    <DialogContent>
+        @if (Plays != null) {
+        <MudTable Items="Plays.OrderByDescending(p => p.TimeStamp)" T="Play" Hover="true" Breakpoint="Breakpoint.Sm">
+            <HeaderContent>
+                <MudTh>Time Stamp</MudTh>
+                <MudTh>Tosser</MudTh>
+                <MudTh>Toss Result</MudTh>
+                <MudTh>Points Awarded</MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Time Stamp">@context.TimeStamp.ToString()</MudTd>
+                <MudTd DataLabel="Tosser">@(Players.Find(p => p.Id == context.Tosser).Name)</MudTd>
+                <MudTd DataLabel="Result">@context.Type.ToString()</MudTd>
+                <MudTd DataLabel="Points Awarded">@(context.CalculatePoints())</MudTd>
+            </RowTemplate>
+        </MudTable>
+    }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="CloseDialog"></MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter]
+    public List<Play> Plays { get; set; } = new List<Play>();
+
+    [Parameter]
+    public List<Player> Players { get; set; } = new List<Player>();
+
+    [CascadingParameter] 
+    public MudDialogInstance MudDialog { get; set; }
+
+    private void CloseDialog() 
+    {
+        MudDialog.Cancel();
+    }
+} 

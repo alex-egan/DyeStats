@@ -1,0 +1,327 @@
+@page "/game/{Id}"
+@using DyeStats.Services.GameService;
+@using DyeStats.Services.LogService;
+@using DyeStats.Services.PlayService;
+@using DyeStats.Services.PlayerService;
+@using DyeStats.Services.LocationService;
+@using DyeStats.Services.PlayTypeService;
+@using DyeStats.Classes;
+@using DyeStats.Shared;
+@using System.Globalization;
+@using MudBlazor;
+@inject IPlayerService PlayerService;
+@inject IGameService GameService;
+@inject IPlayService PlayService;
+@inject IPlayTypeService PlayTypeService;
+@inject ILogService LogService;
+@inject ILocationService LocationService;
+@inject NavigationManager NavigationManager;
+@inject IDialogService DialogService;
+@inject ISnackbar Snackbar;
+@inject NavigationManager Navigation;
+
+<MudContainer Class="flex column">
+    <MudContainer Class="flex row align-items-center">
+        <MudText Typo="Typo.h2" Class="text-align-center">@($"Team 1 {CalculateScore()} Team 2")</MudText>
+    </MudContainer>
+    <MudContainer Class="">
+        <MudImage Src="images/dyetable.jpg" Alt="Die Arena" Class="object-center fit-screen"></MudImage>
+        <MudContainer Class="absolute player-container">
+            @{
+                List<ObjectId> players = Game.Teams.SelectMany(t => t.Players).ToList();
+                @for (int i = 0; i < players.Count(); i++) {
+                    int x = i;
+                    <MudCard Class=@($"absolute player player-{x + 1} w-20")>
+                        <PlayerOptions Player="Players.ToList().Find(p => p.Id == players[x])"
+                                        OnPlayTypeSelected="@(async (PlayCategory category) => await HandlePlay(players[x], category))"></PlayerOptions>
+                    </MudCard>
+                }
+            }
+            <MudButton OnClick="@OpenGameLog" Class="absolute">See Game Log</MudButton>
+        </MudContainer>
+    </MudContainer>
+</MudContainer>
+
+@code {
+    [Parameter]
+    public string? Id { get; set; }
+    private Game Game { get; set; } = new Game();
+    private List<Location> Locations { get; set; } = new List<Location>();
+    private HashSet<Play> Plays { get; set; } = new HashSet<Play>();
+    private HashSet<Player> Players { get; set; } = new HashSet<Player>();
+    private HashSet<PlayType> PlayTypes { get; set; } = new HashSet<PlayType>();
+    private Location? Location { get; set; }
+    private int NumPlayers = 4;
+    public Play? Play;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try 
+        {
+            LogService.LogMessage("Loading Into Game Edit");
+            ServiceResponse<HashSet<Player>?> playerResponse = PlayerService.GetAllPlayers();
+
+            if (playerResponse.Success && playerResponse.Data != null) {
+                Players = playerResponse.Data;
+            }
+
+            GetLocations();
+
+            if (String.IsNullOrEmpty(Id) || Id == "new") {
+                LogService.LogMessage("New Game");
+                Game = new Game {
+                    Teams = new List<Team> {
+                        new Team {
+                            Players = new List<ObjectId> {
+                                ObjectId.Empty,
+                                ObjectId.Empty
+                            }
+                        },
+                        new Team {
+                            Players = new List<ObjectId> {
+                                ObjectId.Empty,
+                                ObjectId.Empty
+                            }
+                        }
+                    }
+                };
+
+                await OpenGameDetails();
+            }
+            else {
+                LogService.LogMessage("Existing Game");
+                ObjectId? id = new ObjectId();
+
+                try {
+                    id = new ObjectId(Id);
+                    LogService.LogMessage($"OnInitialized Id: {id.ToString()}");
+                    GetGameById(id);
+                    GetPlaysForGame(id);
+                    if (Game != null) {
+                        GetLocation(Game.Location);
+                        GetPlayTypesForLocation(Game.Location);
+                    }
+                } catch (Exception e) {
+                    LogService.LogError(e);
+                    NavigationManager.NavigateTo("./Home");
+                }
+            }
+
+            LogService.LogMessage("Everything loaded.");
+        } catch (Exception e) {
+            LogService.LogError(e);
+        }
+    }
+
+    private void GetLocations() {
+        ServiceResponse<List<Location>> response = LocationService.GetAllLocations();
+
+        if (response.Success) {
+            Locations = response.Data;
+        }
+        else {
+            LogService.LogWarning("Could not get locations.");
+        }
+    }
+
+    private void GetGameById(ObjectId id) {
+        ServiceResponse<Game?> response = GameService.GetGameById(id);
+        if (response.Success && response.Data != null) {
+            Game = response.Data;
+            Play = new Play {
+                GameId = Game.Id
+            };
+        }
+        else {
+            LogService.LogWarning("Could not get new Game.");
+        }
+    }
+
+    private void GetPlaysForGame(ObjectId id) {
+        ServiceResponse<HashSet<Play>?> response = PlayService.GetAllPlaysForGame(id);
+
+        if (response.Success && response.Data != null) {
+            Plays = response.Data;
+        }
+        else {
+            LogService.LogWarning($"Could not get plays for game with id: {id}");
+        }
+    }
+
+    private void GetLocation(ObjectId id) {
+        ServiceResponse<Location?> response = LocationService.GetLocationById(id);
+        if (response.Success && response.Data != null) {
+            Location = response.Data;
+        }
+        else {
+            LogService.LogWarning($"Could not get location with id: {id}");
+        }
+    }
+
+    private void GetPlayTypesForLocation(ObjectId id) {
+        ServiceResponse<HashSet<PlayType>?> response = PlayTypeService.GetAllPlayTypesForLocation(id);
+        if (response.Success && response.Data != null) {
+            PlayTypes = response.Data;
+        }
+        else {
+            LogService.LogWarning($"Could not get location with id: {id}");
+        }
+    }
+
+    private async Task HandlePlay(ObjectId playerId, PlayCategory category) {
+        try {
+            LogService.LogMessage($"Handling Play: {playerId}");
+            Play = new Play {
+                GameId = Game.Id,
+                Tosser = playerId
+            };
+
+            await OpenPlayDetails(playerId, category);
+        } 
+        catch (Exception e) 
+        {
+            LogService.LogError(e);
+        }
+    }
+
+    private async Task OpenPlayDetails(ObjectId id, PlayCategory category) {
+        var parameters = new DialogParameters<PlayDetails>();
+        parameters.Add(x => x.Play, Play);
+        parameters.Add(x => x.TotalPlayers, Players.ToList());
+        parameters.Add(x => x.GamePlayers, Game.Teams.SelectMany(t => t.Players).Where(p => p != id).ToList());
+
+        var options = new DialogOptions() { DisableBackdropClick = true };
+        var dialog = await DialogService.ShowAsync<PlayDetails>("New Play", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            SavePlay();
+        }
+    }
+
+    private async Task OpenGameDetails()
+    {
+        try
+        {
+            ObjectId? locationId = Game.Location;
+            var parameters = new DialogParameters<GameDetails>();
+            parameters.Add(x => x.Game, Game);
+            parameters.Add(x => x.Players, Players.ToList());
+            parameters.Add(x => x.Locations, Locations);
+
+            var options = new DialogOptions() { DisableBackdropClick = true };
+            var dialog = await DialogService.ShowAsync<GameDetails>("Edit Game", parameters, options);
+            var result = await dialog.Result;
+
+            if (!result.Canceled)
+            {
+                if (locationId != Game.Location) {
+                    GetLocation(Game.Location);
+                }
+
+                SaveGame(Game);
+            }
+        }
+        catch (Exception e)
+        {
+            LogService.LogError(e);
+        }
+    }
+
+    private async Task OpenGameLog() {
+        DialogParameters<GameLog> parameters = new DialogParameters<GameLog>();
+        parameters.Add(x => x.Players, Players.Where(p => Game.Teams.SelectMany(t => t.Players).Contains(p.Id)).ToList());
+        parameters.Add(x => x.Plays, Plays.ToList());
+
+        var options = new DialogOptions() { };
+        var dialog = await DialogService.ShowAsync<GameLog>("Game Log", parameters, options);
+    }
+
+    private void SaveGame(Game game) {
+        try {
+            bool isNew = Game.Id == null;
+            LogService.LogMessage("Saving Game.");
+            game.Id = ObjectId.NewObjectId();
+            LogService.LogMessage(Game.Teams[0].Players[0].ToString());
+            ServiceResponse<Game> response = GameService.UpsertGame(game);
+            if (response.Success && response.Data != null) {
+                LogService.LogMessage("Game saved. Setting up game.");
+                Game = response.Data;
+                LogService.LogMessage($"Game Id: {Game.Id}");
+                Play = new Play {
+                    GameId = Game.Id
+                };
+                LogService.LogMessage($"Play GameId: {Play.GameId}");
+                if (isNew) {
+                    Navigation.NavigateTo($"./game/{Game.Id.ToString()}", false);
+                } else {
+                    Snackbar.Add("Game saved successfully");
+                }
+            }
+        } catch (Exception e) {
+            LogService.LogError(e);
+        }
+    }
+
+    private void SavePlay() {
+        Play.TimeStamp = DateTime.Now;
+        ServiceResponse<Play?> response = PlayService.UpsertPlay(Play);
+        
+        if (response.Success) {
+            Plays.Add(response.Data);
+            Play = new Play();
+            StateHasChanged();
+            Snackbar.Configuration.SnackbarVariant = Variant.Filled;
+            Snackbar.Configuration.VisibleStateDuration = 2500;
+            Snackbar.Configuration.MaxDisplayedSnackbars = 4;
+            Snackbar.Configuration.HideTransitionDuration = 500;
+            Snackbar.Configuration.ShowTransitionDuration = 500;
+            Snackbar.Add("Play saved successfully", Severity.Success);
+        }
+    }
+
+    private string CalculateScore() {
+        int[] scores = new int[2];
+
+        foreach (Play play in Plays) {
+            bool wasTeam1Toss = Game.Teams.Select(p => p.Players).ToList()[0].Contains(play.Tosser);
+            int score = play.CalculatePoints();
+            PlayType type = PlayTypes.ToList().Find(pt => pt.Id == play.Type);
+
+            if (type.Category == PlayCategory.Fifa && score > 0) {
+                scores = CalculateTeamTotal(wasTeam1Toss, true, scores, score);
+            } else {
+                scores = CalculateTeamTotal(wasTeam1Toss, false, scores, score);
+            }
+        }
+
+        return $"{scores[0]} - {scores[1]}";
+    }
+
+    private int[] CalculateTeamTotal(bool wasTeam1Toss, bool reverseScore, int[] scores, int score) {
+        if (reverseScore) {
+            if (wasTeam1Toss) {
+                scores[1] += score;
+            } else {
+                scores[0] += score;
+            }
+        }
+        else {
+            if (wasTeam1Toss) {
+                scores[0] += score;
+            } else {
+                scores[1] += score;
+            }
+        }
+
+        return scores;
+    }
+
+    //Need to know:
+    //  Which team tossed
+    //  
+    //Fifa --> Point for opposite team
+    //Sink --> Point for current team
+    //
+}

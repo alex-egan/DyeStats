@@ -1,0 +1,61 @@
+@using DyeStats.Classes;
+@using Microsoft.AspNetCore.Components;
+@using DyeStats.Services.LogService;
+@inject ILogService LogService
+
+<MudDialog>
+    <DialogContent>
+        @if (TotalPlayers != null && Play != null) {
+        @if (Type.Category == PlayCategory.Live) {
+            <MudSelect @bind-Value=Play.Defender T="ObjectId" Label="Defender" AnchorOrigin="Origin.BottomCenter">
+                @foreach (ObjectId id in GamePlayers) {
+                    <MudSelectItem Value="@(id)">@TotalPlayers.ToList().Find(p => p.Id == id).Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudCheckBox Label="Was Caught?" @bind-Checked=@Play.WasCaught></MudCheckBox>
+        }
+        else if (Type.Category == PlayCategory.Fifa) {
+            <MudSelect @bind-Value=Play.Kicker T="ObjectId" Label="Kicker" AnchorOrigin="Origin.BottomCenter">
+                @foreach (ObjectId id in GamePlayers) {
+                    <MudSelectItem Value="@(id)">@TotalPlayers.ToList().Find(p => p.Id == id).Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect @bind-Value=Play.Catcher T="ObjectId" Label="Catcher" AnchorOrigin="Origin.BottomCenter">
+                @foreach (ObjectId id in GamePlayers) {
+                    <MudSelectItem Value="@(id)">@TotalPlayers.ToList().Find(p => p.Id == id).Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudCheckBox Label="Was Caught?" @bind-Checked=@Play.WasCaught></MudCheckBox>
+        }
+    }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick=SavePlay>Submit</MudButton>
+        <MudButton OnClick="CancelEdit">Cancel</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter]
+    public Play? Play { get; set; }
+
+    [Parameter]
+    public List<Player>? TotalPlayers { get; set; }
+
+    [Parameter]
+    public List<ObjectId>? GamePlayers { get; set; }
+
+    [Parameter]
+    public PlayType Type { get; set; }
+    
+    [CascadingParameter] 
+    MudDialogInstance MudDialog { get; set; }
+
+    private void CancelEdit() {
+        MudDialog.Cancel();
+    }
+
+    private void SavePlay() {
+        MudDialog.Close(DialogResult.Ok(Play));
+    }
+}

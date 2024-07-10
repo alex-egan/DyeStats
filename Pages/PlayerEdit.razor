@@ -1,0 +1,49 @@
+@page "/players"
+@using DyeStats.Services.GameService;
+@using DyeStats.Services.PlayService;
+@using DyeStats.Services.PlayerService;
+@using DyeStats.Services.LogService;
+@using DyeStats.Classes
+@using MudBlazor
+@using DyeStats.Shared;
+@inject IPlayerService PlayerService;
+@inject IPlayService PlayService;
+@inject ILogService LogService;
+@inject NavigationManager NavigationManager;
+@inject ISnackbar Snackbar
+
+<MudContainer>
+    <Table Items="Players"></Table>
+    <MudButton OnClick="AddPlayer">Add Player</MudButton>
+    <MudButton OnClick="UpsertPlayers">Save</MudButton>
+</MudContainer>
+
+@code {
+    [Parameter]
+    public string? Id { get; set; }
+    public HashSet<Player> Players { get; set; } = new HashSet<Player>();
+    private Player? selectedPlayer = null;
+    private string searchString = "";
+
+    protected override void OnInitialized()
+    {
+        ServiceResponse<HashSet<Player>> response = PlayerService.GetAllPlayers();
+        
+        if (response.Success && response.Data != null) {
+            Players = response.Data;
+        }
+    }
+
+    private void AddPlayer() {
+        Players.Add(new Player());
+    }
+
+    private void UpsertPlayers() {
+        ServiceResponse<HashSet<Player>?> response = PlayerService.UpsertPlayers(Players);
+        LogService.LogMessage("Hit Upsert.");
+        
+        if (response.Success && response.Data != null) {
+            Players = response.Data;
+        }
+    }
+}
