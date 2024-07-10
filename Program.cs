@@ -1,16 +1,17 @@
 global using LiteDB;
 global using System.Linq;
+global using DyeStats.Services.GameService;
+global using DyeStats.Classes;
+global using DyeStats.Services.PlayService;
+global using DyeStats.Services.PlayerService;
+global using DyeStats.Services.LiteDBService;
+global using DyeStats.Services.LocationService;
+global using DyeStats.Services.LogService;
+global using DyeStats.Services.PlayTypeService;
 using DyeStats.Data;
 using MudBlazor.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
-using DyeStats.Services.GameService;
-using DyeStats.Services.PlayService;
-using DyeStats.Services.PlayerService;
-using DyeStats.Services.LiteDBService;
-using DyeStats.Services.LocationService;
-using DyeStats.Services.LogService;
-using DyeStats.Services.PlayTypeService;
 
 var builder = WebApplication.CreateBuilder(args);
 

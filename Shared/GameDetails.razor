@@ -1,9 +1,5 @@
-@using DyeStats.Classes;
 @using Microsoft.AspNetCore.Components;
-@using DyeStats.Services.LogService;
-@using DyeStats.Services.LocationService;
-@inject ILocationService LocationService;
-@inject ILogService LogService
+@inject ILogService LogService;
 
 @if (true)
 {
@@ -50,7 +46,7 @@
 
 @code {
     [Parameter]
-    public Game? Game { get; set; }
+    public Game Game { get; set; } = null!;
 
     [Parameter]
     public List<Player>? Players { get; set; }
